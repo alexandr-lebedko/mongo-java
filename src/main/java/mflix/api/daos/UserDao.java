@@ -1,28 +1,22 @@
 package mflix.api.daos;
 
 import com.mongodb.MongoClientSettings;
-import com.mongodb.MongoWriteException;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.InsertOneOptions;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import mflix.api.models.Session;
 import mflix.api.models.User;
-import org.bson.Document;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
-import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
-import java.text.MessageFormat;
 import java.util.Map;
 
 import static com.mongodb.client.model.Filters.eq;
@@ -127,8 +121,15 @@ public class UserDao extends AbstractMFlixDao {
     }
 
     public boolean deleteUserSessions(String userId) {
-        //TODO> Ticket: User Management - implement the delete user sessions method
-        return sessionsCollection.deleteMany(eq("user_id", userId)).getDeletedCount() > 0;
+        try {
+            if (!ObjectId.isValid(userId)) {
+                return false;
+            }
+            return sessionsCollection.deleteMany(eq("user_id", userId)).getDeletedCount() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     /**
@@ -138,13 +139,14 @@ public class UserDao extends AbstractMFlixDao {
      * @return true if user successfully removed
      */
     public boolean deleteUser(String email) {
-        sessionsCollection.deleteMany(eq("user_id", email));
-        return usersCollection.deleteMany(eq("email", email)).getDeletedCount() > 0;
-
-        // remove user sessions
-        //TODO> Ticket: User Management - implement the delete user method
-        //TODO > Ticket: Handling Errors - make this method more robust by
-        // handling potential exceptions.
+        DeleteResult deleteUser = null;
+        try {
+            deleteUser = usersCollection.deleteMany(eq("email", email));
+            sessionsCollection.deleteMany(eq("user_id", email));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return deleteUser.getDeletedCount() > 0;
     }
 
     /**
@@ -159,11 +161,12 @@ public class UserDao extends AbstractMFlixDao {
         if (isNull(userPreferences)) {
             throw new IncorrectDaoOperation("Preferences cannot be null");
         }
-
-        //TODO> Ticket: User Preferences - implement the method that allows for user preferences to
-        // be updated.
-        //TODO > Ticket: Handling Errors - make this method more robust by
-        // handling potential exceptions when updating an entry.
-        return usersCollection.updateOne(eq("email", email), set("preferences", userPreferences)).getModifiedCount() > 0;
+        try {
+            UpdateResult updateResult = usersCollection.updateOne(eq("email", email), set("preferences", userPreferences));
+            return updateResult.getModifiedCount() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 }
